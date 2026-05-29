@@ -1,0 +1,8 @@
+flask>=3.0
+python-pptx>=1.0
+Pillow>=10.0
+# Optional fast PDF→image backend used by the PPTX converter.
+# If neither pdf2image nor pymupdf is installed, the converter falls back to
+# a low-fidelity Pillow path that only extracts embedded pictures.
+pymupdf>=1.24
+gunicorn>=21.2

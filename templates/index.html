@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SlideCraft Lite</title>
+<script>
+  // Apply theme before paint to avoid flash
+  (function(){
+    var t = localStorage.getItem('sc_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+
+<!-- Drag & drop upload zone -->
+<div class="drop-overlay" id="drop-overlay">
+  <div class="drop-box">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    <h3>Drop your PPTX here</h3>
+    <p>Or use the Upload button</p>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </div>
+    <div class="logo-text">
+      <div class="logo-brand">SlideCraft</div>
+      <div class="logo-sub">LITE</div>
+    </div>
+  </div>
+
+  <!-- Filename of the currently loaded deck -->
+  <div class="deck-name" id="deck-name" title="No deck loaded">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+    <span id="deck-name-text">No deck loaded</span>
+  </div>
+
+  <div class="slide-pill" id="slide-counter">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+    Slide
+    <input type="number" id="slide-num-input" class="slide-num-input"
+           min="1" max="{{ num_slides if num_slides else 1 }}"
+           value="{{ 1 if num_slides else 0 }}"
+           title="Type a slide number and press Enter to jump">
+    / <span id="slide-total">{{ num_slides }}</span>
+    <div class="pill-nav">
+      <button class="pill-nav-btn" onclick="gotoSlide(currentSlide - 1)" title="Previous (←)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15,18 9,12 15,6"/></svg>
+      </button>
+      <button class="pill-nav-btn" onclick="gotoSlide(currentSlide + 1)" title="Next (→)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9,18 15,12 9,6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <!-- File group -->
+    <div class="action-group">
+      <span class="group-label">File</span>
+      <label class="btn-action" title="Upload a PPTX">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M20 16v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2"/></svg>
+        <span class="act-label">Upload</span>
+        <input type="file" accept=".pptx" id="upload-input" onchange="uploadPPTX(this)" style="display:none">
+      </label>
+      <div class="group-sep"></div>
+      <label class="btn-action bulk-btn" title="Bulk: up to 10 PPTX, max 300 MB total">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v2"/><path d="M20 16v2a2 2 0 01-2 2h-2"/><path d="M4 8V6a2 2 0 012-2h2"/><path d="M8 20H6a2 2 0 01-2-2v-2"/><path d="M9 12l3-3 3 3"/><path d="M12 9v6"/></svg>
+        <span class="act-label">Bulk</span>
+        <input type="file" accept=".pptx" multiple id="bulk-input" onchange="bulkRemoveLogo(this)" style="display:none">
+      </label>
+      <div class="group-sep"></div>
+      <button class="btn-action" onclick="removeLogos()" title="Remove the NotebookLM logo from every slide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
+        <span class="act-label">Remove Logo</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action" id="btn-region-erase" onclick="toggleRegionErase()" title="Click then drag a box on the slide to erase any region">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 14h7v7h-7z"/><path d="M14 3l7 7M3 14l7 7" stroke-dasharray="2 2"/></svg>
+        <span class="act-label">Erase Box</span>
+      </button>
+      <div class="group-sep"></div>
+      <div class="recent-dropdown">
+        <button class="btn-action" onclick="toggleRecentMenu(event)" title="Recently opened decks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+          <span class="act-label">Recent</span>
+        </button>
+        <div class="recent-menu" id="recent-menu">
+          <div class="recent-empty">No recent decks yet.</div>
+        </div>
+      </div>
+      <div class="group-sep"></div>
+      <button class="btn-action" onclick="openWatermarkModal()" title="Add a text or image watermark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span class="act-label">Watermark</span>
+      </button>
+    </div>
+
+    <!-- Slide: per-slide operations -->
+    <div class="action-group">
+      <span class="group-label">Slide</span>
+      <button class="btn-action" onclick="duplicateSlide()" title="Duplicate the current slide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        <span class="act-label">Duplicate</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action" onclick="downloadSlidePNG()" title="Download current slide as PNG">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="act-label">PNG</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action" onclick="printDeck()" title="Print the whole deck">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span class="act-label">Print</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action btn-action-danger" onclick="deleteSlide()" title="Delete the current slide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        <span class="act-label">Delete</span>
+      </button>
+    </div>
+
+    <!-- Edit group: Undo / Redo / Save -->
+    <div class="action-group">
+      <span class="group-label">Edit</span>
+      <button class="btn-action" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        <span class="act-label">Undo</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23,4 23,10 17,10"/><path d="M20.49 15A9 9 0 1 1 18 6.36L23 10"/></svg>
+        <span class="act-label">Redo</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action" onclick="saveCheckpoint()" title="Save checkpoint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+        <span class="act-label">Save</span>
+      </button>
+    </div>
+
+    <!-- Export group -->
+    <div class="action-group">
+      <span class="group-label">Export</span>
+      <div class="export-dropdown">
+        <button class="btn-action accent" onclick="toggleExportMenu(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="act-label">Export</span>
+          <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+        </button>
+        <div class="export-menu" id="export-menu">
+          <button class="export-menu-item" onclick="exportPPTX(); closeExportMenu()">PowerPoint <span class="fmt-tag">PPTX</span></button>
+          <button class="export-menu-item" onclick="exportPDF(); closeExportMenu()">PDF Document <span class="fmt-tag">PDF</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset -->
+    <div class="action-group">
+      <span class="group-label">Reset</span>
+      <button class="btn-action reset-btn" onclick="resetAll()" title="Restore all slides to the uploaded original">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+        <span class="act-label">Reset</span>
+      </button>
+    </div>
+
+    <!-- Present -->
+    <div class="action-group">
+      <button class="btn-action" onclick="enterPresentation()" title="Present (F5)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
+        <span class="act-label">Present</span>
+      </button>
+    </div>
+
+    <!-- Help + theme -->
+    <div class="action-group">
+      <button class="btn-action" onclick="toggleTheme()" id="theme-toggle" title="Toggle dark mode (T)">
+        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <span class="act-label">Theme</span>
+      </button>
+      <div class="group-sep"></div>
+      <button class="btn-action" onclick="openHelp()" title="Help (H or ?)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span class="act-label">Help</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Autosave indicator -->
+  <div class="autosave-indicator" id="autosave-indicator" title="Every destructive op auto-snapshots; undo with Ctrl+Z">
+    <span class="autosave-dot"></span>
+    <span id="autosave-text">Idle</span>
+  </div>
+</header>
+
+<!-- Main -->
+<div class="main">
+  <aside class="thumb-strip" id="thumb-strip">
+    {% for s in slides %}
+    <div class="thumb-item {% if loop.first %}active{% endif %}" id="thumb-{{ s.index }}" onclick="gotoSlide({{ s.index }})">
+      <img src="{{ url_for('serve_slide', name=s.file) }}" alt="Slide {{ s.index }}">
+      <span class="num">{{ s.index }}</span>
+    </div>
+    {% endfor %}
+  </aside>
+
+  <main class="canvas-area">
+    <div class="canvas-viewport" id="viewport">
+      {% if num_slides %}
+        <div class="slide-container" id="slide-container">
+          <img id="slide-img" src="{{ url_for('serve_slide', name='slide-01.jpg') }}" alt="Current slide">
+          <div class="region-erase-layer" id="region-erase-layer"></div>
+          <div class="region-erase-box" id="region-erase-box"></div>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.4;margin-bottom:16px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <h3>No slides yet</h3>
+          <p>Click <strong>Upload</strong> to open a PPTX, or drag a file anywhere on the page.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Zoom controls -->
+    {% if num_slides %}
+    <div class="zoom-bar" id="zoom-bar">
+      <button class="zoom-btn" onclick="zoomOut()" title="Zoom out (-)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <input type="range" id="zoom-range" min="20" max="200" step="5" value="70" oninput="setZoom(this.value)">
+      <span class="zoom-val" id="zoom-val">70%</span>
+      <button class="zoom-btn" onclick="zoomIn()" title="Zoom in (+)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <span class="zoom-sep"></span>
+      <button class="zoom-btn" onclick="zoomReset()" title="Reset to 70%">70%</button>
+      <button class="zoom-btn" onclick="zoomFit()" title="Fit to screen">Fit</button>
+    </div>
+    {% endif %}
+  </main>
+</div>
+
+<!-- Presentation mode -->
+<div id="presentation-mode">
+  <img id="pres-img" alt="">
+</div>
+
+<!-- Watermark modal -->
+<div class="modal-backdrop" id="wm-modal" onclick="if(event.target===this)closeWatermarkModal()">
+  <div class="modal-card wm-card">
+    <h3>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Add Watermark
+    </h3>
+
+    <!-- Live preview -->
+    <div class="wm-preview-wrap">
+      <div class="wm-preview" id="wm-preview" title="Preview — click anywhere to place the watermark">
+        <img id="wm-preview-bg" src="" alt="slide preview">
+        <!-- Text overlay (shown for text mode) -->
+        <div class="wm-preview-text" id="wm-preview-text">CONFIDENTIAL</div>
+        <!-- Image overlay (shown for image mode) -->
+        <img class="wm-preview-img" id="wm-preview-img" src="" alt="">
+        <!-- Tiled overlay container -->
+        <div class="wm-preview-tile-wrap" id="wm-preview-tile-wrap"></div>
+        <!-- Crosshair shown when Custom mode is active -->
+        <div class="wm-preview-marker" id="wm-preview-marker"></div>
+      </div>
+      <div class="wm-preview-hint" id="wm-preview-hint">
+        Preview of slide <span id="wm-preview-num">1</span>
+      </div>
+    </div>
+
+    <!-- Type tabs -->
+    <div class="wm-tabs">
+      <button class="wm-tab active" id="wm-tab-text" onclick="setWmType('text')">Text</button>
+      <button class="wm-tab" id="wm-tab-image" onclick="setWmType('image')">Image / Logo</button>
+    </div>
+
+    <!-- TEXT options -->
+    <div id="wm-text-pane">
+      <div class="field">
+        <label>Watermark text</label>
+        <input type="text" id="wm-text" maxlength="200" placeholder="CONFIDENTIAL" value="CONFIDENTIAL">
+      </div>
+      <div class="field-row">
+        <div class="field" style="flex:0 0 80px">
+          <label>Color</label>
+          <input type="color" id="wm-color" value="#808080">
+        </div>
+        <div class="field" style="flex:1">
+          <label>Font size <span class="field-val" id="wm-fs-val">7%</span></label>
+          <input type="range" id="wm-fs" min="3" max="20" step="0.5" value="7">
+        </div>
+      </div>
+      <div class="field">
+        <label>Rotation <span class="field-val" id="wm-rot-val">0°</span></label>
+        <div class="rotation-row">
+          <input type="range" id="wm-rot" min="-90" max="90" step="1" value="0" style="flex:1">
+          <button type="button" class="rot-preset" onclick="setWmRotation(0)">0°</button>
+          <button type="button" class="rot-preset" onclick="setWmRotation(-45)">-45°</button>
+          <button type="button" class="rot-preset" onclick="setWmRotation(45)">45°</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMAGE options -->
+    <div id="wm-image-pane" style="display:none">
+      <div class="field">
+        <label>Upload logo / image</label>
+        <label class="btn-file-picker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <span id="wm-image-name">Choose image…</span>
+          <input type="file" accept="image/*" id="wm-image-input" onchange="previewWmImage(this)" style="display:none">
+        </label>
+        <div class="wm-image-preview-wrap" id="wm-image-preview-wrap" style="display:none">
+          <img id="wm-image-preview" alt="logo preview"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Scale <span class="field-val" id="wm-scale-val">15%</span></label>
+        <input type="range" id="wm-scale" min="3" max="60" step="1" value="15">
+      </div>
+    </div>
+
+    <!-- Shared controls -->
+    <div class="field">
+      <label>Position</label>
+      <div class="wm-pos-grid" id="wm-pos-grid">
+        <button type="button" data-pos="top-left"     title="Top Left">↖</button>
+        <button type="button" data-pos="top-right"    title="Top Right">↗</button>
+        <button type="button" data-pos="center" class="active" title="Center">●</button>
+        <button type="button" data-pos="bottom-left"  title="Bottom Left">↙</button>
+        <button type="button" data-pos="bottom-right" title="Bottom Right">↘</button>
+        <button type="button" data-pos="tiled"        title="Tiled / Repeat">▦</button>
+        <button type="button" data-pos="custom" class="wm-pos-custom" title="Custom — click the preview to place" style="grid-column:span 6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><circle cx="12" cy="10" r="3"/><path d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8z"/></svg>
+          <span style="font-size:11px;font-weight:600">Custom — click the preview</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field" id="wm-tile-spacing-field" style="display:none">
+      <label>Tile spacing <span class="field-val" id="wm-ts-val">1.0×</span></label>
+      <input type="range" id="wm-ts" min="0.5" max="3" step="0.1" value="1">
+    </div>
+
+    <div class="field">
+      <label>Opacity <span class="field-val" id="wm-op-val">25%</span></label>
+      <input type="range" id="wm-op" min="5" max="100" step="5" value="25">
+    </div>
+
+    <div class="field">
+      <label>Apply to</label>
+      <div class="wm-scope-toggle">
+        <button type="button" class="wm-scope" id="wm-scope-current" onclick="setWmScope('current')">Current slide</button>
+        <button type="button" class="wm-scope active" id="wm-scope-all" onclick="setWmScope('all')">All slides</button>
+      </div>
+    </div>
+
+    <div class="wm-actions">
+      <button class="btn-action" onclick="closeWatermarkModal()">Cancel</button>
+      <button class="btn-action accent" id="wm-apply-btn" onclick="applyWatermark()" style="flex:1">Apply</button>
+    </div>
+
+    <div style="font-size:11px;color:var(--text3);margin-top:10px;line-height:1.5">
+      Snapshotted automatically — revert any time with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+    </div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div class="modal-backdrop" id="help-modal" onclick="if(event.target===this)closeHelp()">
+  <div class="modal-card">
+    <h3>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How to use SlideCraft Lite
+    </h3>
+    <div class="help-section">
+      <h4>Workflow</h4>
+      <ol>
+        <li><strong>Upload</strong> a PPTX (or drag it onto the page).</li>
+        <li><strong>Remove Logo</strong> erases the NotebookLM watermark from every slide.</li>
+        <li><strong>Watermark</strong> adds a text or image overlay (CONFIDENTIAL, your logo, etc.) to the current slide or all slides.</li>
+        <li><strong>Duplicate / Delete</strong> tweak the deck structure. Drag thumbnails to reorder.</li>
+        <li><strong>Save</strong> creates a checkpoint you can roll back to.</li>
+        <li><strong>Export</strong> downloads the cleaned deck as PPTX or PDF; <strong>PNG</strong> for the current slide only.</li>
+        <li><strong>Reset</strong> restores the original uploaded slides.</li>
+      </ol>
+    </div>
+    <div class="help-section">
+      <h4>Bulk processing</h4>
+      <p>The Bulk button accepts up to <strong>10 PPTX files</strong> totalling up to <strong>300 MB</strong>. Logos are removed from every slide and a ZIP of cleaned PPTX files is downloaded.</p>
+    </div>
+    <div class="help-section">
+      <h4>Shortcuts</h4>
+      <table class="shortcuts">
+        <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Previous / Next slide</td></tr>
+        <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / Last slide</td></tr>
+        <tr><td><kbd>Del</kbd></td><td>Delete current slide</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate current slide</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Print</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo</td></tr>
+        <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out (10% steps)</td></tr>
+        <tr><td><kbd>0</kbd></td><td>Reset zoom to 70%</td></tr>
+        <tr><td><kbd>F</kbd></td><td>Fit slide to viewport</td></tr>
+        <tr><td><kbd>F5</kbd></td><td>Enter presentation mode</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Exit presentation / close modal</td></tr>
+        <tr><td><kbd>H</kbd> / <kbd>?</kbd></td><td>Open this help</td></tr>
+        <tr><td><kbd>T</kbd></td><td>Toggle dark / light theme</td></tr>
+        <tr><td><kbd>E</kbd></td><td>Toggle Erase-Box region tool</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Open Recent decks menu</td></tr>
+      </table>
+    </div>
+    <div class="help-section">
+      <h4>Tips</h4>
+      <ul>
+        <li><strong>Erase Box:</strong> click the button, then drag any rectangle on the slide. The selected area is replaced by tiling the row of pixels just above it — same trick as the logo remover, but anywhere you want.</li>
+        <li><strong>Per-session storage:</strong> your decks are isolated from other users by a cookie. Clear your cookies and you'll get a fresh workspace. Sessions older than 24 hours are auto-cleaned.</li>
+        <li><strong>Recent decks:</strong> the last 5 uploads stay one click away in the Recent menu.</li>
+      </ul>
+    </div>
+    <div style="text-align:right;margin-top:18px">
+      <button class="btn-action" onclick="closeHelp()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading + toast -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <p id="loading-msg">Processing...</p>
+  <div class="progress-shell" id="progress-shell" style="display:none">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-detail" id="progress-detail"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<!-- Region-erase hint -->
+<div class="region-hint" id="region-hint">
+  <strong>Erase Box</strong> — drag any rectangle on the slide to clone-stamp it out.
+  <button onclick="toggleRegionErase()">Cancel</button>
+</div>
+
+<script>window.NUM_SLIDES = {{ num_slides }};</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

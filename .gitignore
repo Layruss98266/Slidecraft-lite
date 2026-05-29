@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vscode/
+.idea/
+.DS_Store
+.env
+
+# Runtime state
+sessions/
+static/slides/*.jpg
+static/slides/_originals/
+uploads/
+exports/
+history/
+ops_log.json
+current_deck.txt

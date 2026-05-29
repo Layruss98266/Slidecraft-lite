@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+.venv
+venv
+.git
+.gitignore
+uploads/*
+exports/*
+history/*
+static/slides/*
+static/originals/*
+ops_log.json
+*.md
+run.bat
+run.ps1
+run.sh

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: slidecraft-lite
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: MAX_UPLOAD_MB
+        value: "300"
