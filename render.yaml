@@ -2,10 +2,16 @@ services:
   - type: web
     name: slidecraft-lite
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /
     envVars:
       - key: HOST
         value: 0.0.0.0
       - key: MAX_UPLOAD_MB
-        value: "300"
+        value: "100"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: GUNICORN_THREADS
+        value: "2"
+      - key: SESSION_TTL_HOURS
+        value: "6"
