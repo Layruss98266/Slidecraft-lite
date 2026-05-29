@@ -220,15 +220,20 @@ def _convert_pptx_to_images_libreoffice(pptx_path, output_dir):
             raise RuntimeError("PDF conversion produced no output")
         try:
             from pdf2image import convert_from_path
-            for i, img in enumerate(convert_from_path(str(pdfs[0]), dpi=200)):
-                img.convert("RGB").save(str(output_dir / f"slide-{i+1:02d}.jpg"), "JPEG", quality=95)
+            # Lower DPI on free-tier-class hosts; controls speed vs sharpness.
+            dpi = int(os.environ.get('SLIDE_DPI', 140))
+            for i, img in enumerate(convert_from_path(str(pdfs[0]), dpi=dpi)):
+                img.convert("RGB").save(str(output_dir / f"slide-{i+1:02d}.jpg"),
+                                        "JPEG", quality=85, optimize=False)
         except ImportError:
             import fitz
             doc = fitz.open(str(pdfs[0]))
-            mat = fitz.Matrix(2.0, 2.0)
+            # 1.5x zoom ≈ 108 DPI rendered into JPG. Was 2.0x — ~45% slower.
+            zoom = float(os.environ.get('SLIDE_ZOOM', 1.5))
+            mat = fitz.Matrix(zoom, zoom)
             for i, page in enumerate(doc):
                 pix = page.get_pixmap(matrix=mat)
-                (output_dir / f"slide-{i+1:02d}.jpg").write_bytes(pix.tobytes("jpeg"))
+                (output_dir / f"slide-{i+1:02d}.jpg").write_bytes(pix.tobytes("jpeg", jpg_quality=85))
             doc.close()
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -1196,6 +1201,23 @@ def _gc_loop():
 
 _gc_thread = threading.Thread(target=_gc_loop, daemon=True)
 _gc_thread.start()
+
+
+# ── Pre-warm LibreOffice so the first user upload isn't penalized with the
+#    ~8-second soffice cold-start (font/profile cache build). ─────────────
+def _warm_libreoffice():
+    lo = _find_libreoffice()
+    if not lo:
+        return
+    try:
+        # Spin up headless, let it build its user profile, then exit.
+        subprocess.run([lo, "--headless", "--terminate_after_init"],
+                       timeout=60, capture_output=True)
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+
+threading.Thread(target=_warm_libreoffice, daemon=True).start()
 
 
 if __name__ == "__main__":

@@ -24,6 +24,10 @@ RUN pip install -r requirements.txt gunicorn
 
 COPY . .
 
+# Pre-warm LibreOffice so its user-profile cache is baked into the image.
+# Saves ~5-8s on the first PPTX upload at runtime.
+RUN libreoffice --headless --terminate_after_init 2>/dev/null || true
+
 RUN mkdir -p sessions
 
 EXPOSE 10000
