@@ -195,9 +195,22 @@ header::before {
   border-radius: 4px; background: rgba(59,130,246,0.1); color: var(--accent2);
 }
 
-@media (max-width: 1200px) {
+/* Collapse labels progressively as the window narrows. We added several
+   buttons (Erase Box, Recent, Theme) plus the autosave pill, so the row
+   needs aggressive shrinking before it overflows. */
+@media (max-width: 1600px) {
   .btn-action .act-label { display: none; }
   .btn-action { padding: 6px 8px; }
+  .action-group .group-label { display: none; }
+  .action-group { padding: 4px 6px; gap: 2px; }
+  .autosave-indicator { padding: 3px 8px; font-size: 10px; }
+  .autosave-indicator #autosave-text { max-width: 80px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (max-width: 1100px) {
+  .autosave-indicator #autosave-text { display: none; }
+  .autosave-indicator { padding: 5px; }
+  .group-sep { display: none; }
 }
 
 /* Main layout */
